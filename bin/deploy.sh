@@ -4,9 +4,6 @@ shopt -s nullglob
 ENVIRONMENTS=( hosts/* )
 ENVIRONMENTS=( "${ENVIRONMENTS[@]##*/}" )
 NUM_ARGS=2
-BRANCH_NAME="$(git symbolic-ref HEAD 2>/dev/null)" ||
-BRANCH_NAME="(unnamed branch)"     # detached HEAD
-BRANCH_NAME=${BRANCH_NAME##refs/heads/}
 
 show_usage() {
   echo "Usage: deploy <environment> <site name> [options]
@@ -56,12 +53,17 @@ local_branch_is_up_to_date(){
     fi
 }
 
+<<<<<<< 77f72ffdcf173eb03903e98483ef5e9b13288191
 [[ $# -lt 2 ]] && { show_usage; exit 0; }
 
 for arg
 do
   [[ $arg = -h ]] && { show_usage; exit 0; }
 done
+=======
+
+HOSTS_FILE="hosts/$1"
+>>>>>>> Add verify branch is up to date function
 
 ENV="$1"; shift
 SITE="$1"; shift
@@ -77,9 +79,9 @@ if [[ ! -e $HOSTS_FILE ]]; then
   exit 0
 fi
 
-if [[ $BRANCH_NAME != 'master' ]]
+if [[ local_branch_is_up_to_date != 0 ]]
 then
-  echo -e 'You are not on master branch. Are you sure you want to continue? [y/N]'
+  echo -e 'Your branch is not up to date. Do you want to continue? [y/N]'
   read -r RESPONSE
 fi
 if [[ $RESPONSE =~ ^([yY][eE][sS]|[yY])$ ]]
