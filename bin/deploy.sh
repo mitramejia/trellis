@@ -1,12 +1,15 @@
 #!/bin/bash
+
+# 1. Check if environment exists. If not exit the script
+# 2. Check if current branch is master. If not display warning and prompt a confirmation message
+# 3. Check if current branch is upt to date. If not display warning and prompt a confirmation message
+# If all of the above are true run the deploy command
+
 shopt -s nullglob
 
 ENVIRONMENTS=( hosts/* )
 ENVIRONMENTS=( "${ENVIRONMENTS[@]##*/}" )
-NUM_ARGS=2
-BRANCH_NAME="$(git symbolic-ref HEAD 2>/dev/null)" ||
-BRANCH_NAME="(unnamed branch)"     # detached HEAD
-BRANCH_NAME=${BRANCH_NAME##refs/heads/}
+
 
 show_usage() {
   echo "Usage: deploy <environment> <site name> [options]
@@ -25,48 +28,35 @@ Examples:
 "
 }
 
-# Get local branch name
+# Get current local branch name
 local_branch_name(){
-    BRANCH_NAME="$(git symbolic-ref HEAD 2>/dev/null)" ||
-    BRANCH_NAME="(unnamed branch)"     # detached HEAD
-    BRANCH_NAME=${BRANCH_NAME##refs/heads/}
+    local BRANCH_NAME="$(git symbolic-ref HEAD 2>/dev/null)" ||
+    local BRANCH_NAME="(unnamed branch)"     # detached HEAD
+    local BRANCH_NAME=${BRANCH_NAME##refs/heads/}
     echo ${BRANCH_NAME}
 }
 
-# Returns 0 if local branch is up to date with it's remote counterpart
-local_branch_is_up_to_date(){
-    UPSTREAM=${1:-'@{u}'}
-    LOCAL=$(git rev-parse @)
-    REMOTE=$(git rev-parse "$UPSTREAM")
-    BASE=$(git merge-base @ "$UPSTREAM")
+# Check if current local branch is up to date with it's remote counterpart
+branch_is_up_to_date(){
+    local UPSTREAM=${1:-'@{u}'}
+    local LOCAL=$(git rev-parse @)
+    local REMOTE=$(git rev-parse "$UPSTREAM")
+    local BASE=$(git merge-base @ "$UPSTREAM")
 
     if [ ${LOCAL} = ${REMOTE} ]; then
-        # run deploy command
-        echo "Up-to-date"
         return 0
-
-    elif [ ${LOCAL} = ${BASE} ]; then
-        echo "Warning: your is not up to date. Enter 'yes' to continue if you know what you're doing or        stop and pull down the latest changes with git pull origin "$(local_branch_name);
-
-    elif [ ${REMOTE} = ${BASE} ]; then
-        echo "Maybe you need to push the remote branch and solve conflicts"
-
     else
-        echo "It seems local branch diverges"
+        return 1
     fi
 }
 
-<<<<<<< 77f72ffdcf173eb03903e98483ef5e9b13288191
+
 [[ $# -lt 2 ]] && { show_usage; exit 0; }
 
 for arg
 do
   [[ $arg = -h ]] && { show_usage; exit 0; }
 done
-=======
-
-HOSTS_FILE="hosts/$1"
->>>>>>> Add verify branch is up to date function
 
 ENV="$1"; shift
 SITE="$1"; shift
@@ -74,7 +64,8 @@ EXTRA_PARAMS=$@
 DEPLOY_CMD="ansible-playbook deploy.yml -e env=$ENV -e site=$SITE $EXTRA_PARAMS"
 HOSTS_FILE="hosts/$ENV"
 
-if [[ ! -e $HOSTS_FILE ]]; then
+# Check if inserted environment exists
+if [[ ! -e ${HOSTS_FILE} ]]; then
   echo "Error: $ENV is not a valid environment ($HOSTS_FILE does not exist)."
   echo
   echo "Available environments:"
@@ -82,15 +73,24 @@ if [[ ! -e $HOSTS_FILE ]]; then
   exit 0
 fi
 
-if [[ $BRANCH_NAME != 'master' ]]
-then
-  echo -e 'You are not on master branch. Are you sure you want to continue? [y/N]'
-  read -r RESPONSE
+# Ask for confirmation if current local branch is not master
+if [[ local_branch_name != 'master' ]]; then
+  read -p "Warning: you are deploying from when the site is set to . Enter 'yes' to continue if you know what you're doing." RESPONSE
+
+  if [[ ${RESPONSE} =~ ^([yY][eE][sS]|[yY])$ ]]; then
+    ${DEPLOY_CMD}
+  fi
+
+# Ask for confirmation if current branch is up to date with it's remote counterpart
+elif [[ !branch_is_up_to_date ]]; then
+      read -p "Warning: your branch is not up to date. Enter 'yes' to continue if you know what you're doing or stop and pull down the latest changes with git pull origin " $(local_branch_name) RESPONSE
+    if [[ ${RESPONSE} =~ ^([yY][eE][sS]|[yY])$ ]]; then
+      ${DEPLOY_CMD}
+    fi
+
+#if everything is ok. Run the deploy script
+else
+    ${DEPLOY_CMD}
 fi
-if [[ $RESPONSE =~ ^([yY][eE][sS]|[yY])$ ]]
-  then
-    $DEPLOY_CMD
-  else
-    echo -e 'Aborted'
-    exit 0
-fi
+
+
